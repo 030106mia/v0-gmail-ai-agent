@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { analyzeEmails } from "@/lib/ai"
 import type { EmailItem } from "@/lib/types"
 
 function hasGmailCredentials(): boolean {
@@ -124,8 +125,9 @@ const MOCK_EMAILS: EmailItem[] = [
 export async function GET(request: NextRequest) {
   try {
     if (!hasGmailCredentials()) {
+      const analyzed = await analyzeEmails(MOCK_EMAILS)
       return NextResponse.json({
-        emails: MOCK_EMAILS,
+        emails: analyzed,
         fetchedAt: new Date().toISOString(),
       })
     }
@@ -137,7 +139,8 @@ export async function GET(request: NextRequest) {
     )
 
     const { fetchEmailsByLabels } = await import("@/lib/gmail")
-    const emails = await fetchEmailsByLabels(maxResults)
+    const rawEmails = await fetchEmailsByLabels(maxResults)
+    const emails = await analyzeEmails(rawEmails)
     return NextResponse.json({ emails, fetchedAt: new Date().toISOString() })
   } catch (error) {
     console.error("Failed to fetch emails:", error)

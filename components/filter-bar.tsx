@@ -112,7 +112,7 @@ export function FilterBar({
               value={searchQuery}
               onChange={(e) => onSearchQueryChange(e.target.value)}
               placeholder="搜索发件人 / 主题 / 内容"
-              className="h-8 w-48 pl-8 text-xs"
+              className="h-8 w-56 pl-8 pr-4 text-xs"
             />
           </div>
         </div>
