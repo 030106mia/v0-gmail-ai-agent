@@ -1,8 +1,9 @@
 "use client"
 
+import { useState, useRef, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Mail, ExternalLink, CheckCircle2, Sparkles } from "lucide-react"
+import { Mail, ExternalLink, CheckCircle2, Sparkles, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { EmailItem, EmailStatus } from "@/lib/types"
 import { statusLabels } from "@/lib/types"
@@ -33,42 +34,81 @@ function getStatusStyle(status: EmailStatus) {
   }
 }
 
+function collapseBlankLines(s: string) {
+  return s.split("\n").filter((line) => line.trim() !== "").join("\n")
+}
+
+function ExpandableText({ text, className }: { text: string; className?: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const [clamped, setClamped] = useState(false)
+  const ref = useRef<HTMLParagraphElement>(null)
+  const displayText = collapseBlankLines(text)
+
+  useEffect(() => {
+    const el = ref.current
+    if (el) setClamped(el.scrollHeight > el.clientHeight)
+  }, [displayText])
+
+  return (
+    <div className="relative">
+      <p
+        ref={ref}
+        className={cn(
+          "text-xs leading-relaxed whitespace-pre-line transition-all",
+          !expanded && "line-clamp-4",
+          className,
+        )}
+      >
+        {displayText}
+      </p>
+      {clamped && !expanded && (
+        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-inherit pointer-events-none" />
+      )}
+      {(clamped || expanded) && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="mt-1.5 flex items-center gap-0.5 text-[11px] text-primary hover:text-primary/80 transition-colors font-medium"
+        >
+          {expanded ? (
+            <>{"收起"}<ChevronUp className="size-3" /></>
+          ) : (
+            <>{"展开全文"}<ChevronDown className="size-3" /></>
+          )}
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function EmailCard({ email, onGenerateReply, onCreateJira, onMarkProcessed }: EmailCardProps) {
   return (
     <article className="group rounded-xl border border-border bg-card shadow-sm hover:shadow-md transition-shadow">
       {/* Card header */}
-      <div className="flex items-start gap-3 p-5 pb-3">
-        <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-primary-foreground", email.avatarColor)}>
-          {email.avatarLetter}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-card-foreground truncate">{email.fromName}</span>
-            <span className="text-xs text-muted-foreground truncate hidden sm:inline">{email.fromEmail}</span>
+      <div className="p-5 pb-3 space-y-2.5">
+        {/* Row 1: Subject */}
+        <h3 className="text-sm font-semibold leading-snug text-card-foreground truncate">{email.subject}</h3>
+
+        {/* Row 2: Avatar + Info + Time/Score */}
+        <div className="flex items-center gap-3">
+          <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-primary-foreground", email.avatarColor)}>
+            {email.avatarLetter}
           </div>
-          <h3 className="mt-1 text-sm font-semibold leading-snug text-card-foreground line-clamp-2">{email.subject}</h3>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {email.tags.map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0 h-5 font-normal">
-                {tag}
-              </Badge>
-            ))}
-            <span className="text-[10px] text-muted-foreground">{email.receivedAt}</span>
-            <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5 font-normal", getStatusStyle(email.status))}>
-              {statusLabels[email.status]}
-            </Badge>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-card-foreground truncate">{email.fromName}</p>
+            <p className="text-xs text-muted-foreground truncate">{email.fromEmail}</p>
           </div>
-        </div>
-        <div className="flex flex-col items-end gap-1.5 shrink-0">
-          <div className={cn("flex items-center justify-center rounded-lg border px-2.5 py-1 text-xs font-bold tabular-nums", getScoreColor(email.score))}>
-            {email.score}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] text-muted-foreground whitespace-nowrap">{email.receivedAt}</span>
+            <div className={cn("flex items-center justify-center rounded-lg border px-2.5 py-1 text-xs font-bold tabular-nums", getScoreColor(email.score))}>
+              {email.score}
+            </div>
+            {email.isNew && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
+                <Sparkles className="size-2.5" />
+                New
+              </span>
+            )}
           </div>
-          {email.isNew && (
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
-              <Sparkles className="size-2.5" />
-              New
-            </span>
-          )}
         </div>
       </div>
 
@@ -81,9 +121,7 @@ export function EmailCard({ email, onGenerateReply, onCreateJira, onMarkProcesse
             {email.language}
           </Badge>
         </div>
-        <p className="text-xs leading-relaxed text-card-foreground/80 whitespace-pre-line line-clamp-4">
-          {email.originalBody}
-        </p>
+        <ExpandableText text={email.originalBody} className="text-card-foreground/80" />
       </div>
 
       {/* Translation */}
@@ -94,9 +132,7 @@ export function EmailCard({ email, onGenerateReply, onCreateJira, onMarkProcesse
             {"重新翻译"}
           </button>
         </div>
-        <p className="text-xs leading-relaxed text-card-foreground whitespace-pre-line line-clamp-4">
-          {email.translatedZh}
-        </p>
+        <ExpandableText text={email.translatedZh} className="text-card-foreground" />
       </div>
 
       {/* Card footer actions */}
