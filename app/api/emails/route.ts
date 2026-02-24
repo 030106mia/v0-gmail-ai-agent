@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import { fetchEmailsByLabels } from "@/lib/gmail"
 import type { EmailItem } from "@/lib/types"
 
 function hasGmailCredentials(): boolean {
@@ -137,6 +136,7 @@ export async function GET(request: NextRequest) {
       50
     )
 
+    const { fetchEmailsByLabels } = await import("@/lib/gmail")
     const emails = await fetchEmailsByLabels(maxResults)
     return NextResponse.json({ emails, fetchedAt: new Date().toISOString() })
   } catch (error) {

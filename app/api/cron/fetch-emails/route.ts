@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import { fetchEmailsByLabels } from "@/lib/gmail"
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization")
@@ -10,6 +9,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const { fetchEmailsByLabels } = await import("@/lib/gmail")
     const emails = await fetchEmailsByLabels(30)
     console.log(
       `[Cron] Fetched ${emails.length} emails at ${new Date().toISOString()}`
