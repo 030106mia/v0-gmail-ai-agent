@@ -76,9 +76,7 @@ export default function GmailAgentPage() {
   const [timeFilter, setTimeFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [languageFilter, setLanguageFilter] = useState("all")
-  const [sortBy, setSortBy] = useState("recommended")
   const [viewMode, setViewMode] = useState("card")
-  const [featuredOnly, setFeaturedOnly] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
   // Tab state
@@ -114,11 +112,6 @@ export default function GmailAgentPage() {
       result = result.filter((e) => e.language === languageFilter)
     }
 
-    // Featured only (score >= 85)
-    if (featuredOnly) {
-      result = result.filter((e) => e.score >= 85)
-    }
-
     // Search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
@@ -132,17 +125,8 @@ export default function GmailAgentPage() {
       )
     }
 
-    // Sort
-    if (sortBy === "score") {
-      result.sort((a, b) => b.score - a.score)
-    } else if (sortBy === "time") {
-      // simple simulation
-      result.sort((a, b) => a.receivedAt.localeCompare(b.receivedAt))
-    }
-    // "recommended" keeps original order
-
     return result
-  }, [emails, activeTab, statusFilter, languageFilter, featuredOnly, searchQuery, sortBy])
+  }, [emails, activeTab, statusFilter, languageFilter, searchQuery])
 
   // Actions
   const handleGenerateReply = (email: EmailItem) => {
@@ -190,12 +174,8 @@ export default function GmailAgentPage() {
         onStatusFilterChange={setStatusFilter}
         languageFilter={languageFilter}
         onLanguageFilterChange={setLanguageFilter}
-        sortBy={sortBy}
-        onSortByChange={setSortBy}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
-        featuredOnly={featuredOnly}
-        onFeaturedOnlyChange={setFeaturedOnly}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
       />

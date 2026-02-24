@@ -1,7 +1,6 @@
 "use client"
 
-import { Mail, ChevronDown } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Mail } from "lucide-react"
 
 export function AppHeader() {
   return (
@@ -15,16 +14,8 @@ export function AppHeader() {
           <span className="text-base font-bold text-card-foreground tracking-tight">Gmail AI Agent</span>
         </div>
 
-        {/* Right: User */}
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
-            <div className="flex size-6 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
-              J
-            </div>
-            <span className="hidden sm:inline">{"工作空间"}</span>
-            <ChevronDown className="size-3" />
-          </Button>
-        </div>
+        {/* Right: placeholder */}
+        <div className="flex items-center gap-2" />
       </div>
     </header>
   )

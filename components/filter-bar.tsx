@@ -1,8 +1,7 @@
 "use client"
 
-import { Search, SlidersHorizontal, Star } from "lucide-react"
+import { Search, SlidersHorizontal } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -19,12 +18,8 @@ interface FilterBarProps {
   onStatusFilterChange: (value: string) => void
   languageFilter: string
   onLanguageFilterChange: (value: string) => void
-  sortBy: string
-  onSortByChange: (value: string) => void
   viewMode: string
   onViewModeChange: (value: string) => void
-  featuredOnly: boolean
-  onFeaturedOnlyChange: (value: boolean) => void
   searchQuery: string
   onSearchQueryChange: (value: string) => void
 }
@@ -32,7 +27,6 @@ interface FilterBarProps {
 const viewModes = [
   { label: "卡片", value: "card" },
   { label: "列表", value: "list" },
-  { label: "时间线", value: "timeline" },
 ]
 
 export function FilterBar({
@@ -42,12 +36,8 @@ export function FilterBar({
   onStatusFilterChange,
   languageFilter,
   onLanguageFilterChange,
-  sortBy,
-  onSortByChange,
   viewMode,
   onViewModeChange,
-  featuredOnly,
-  onFeaturedOnlyChange,
   searchQuery,
   onSearchQueryChange,
 }: FilterBarProps) {
@@ -97,18 +87,6 @@ export function FilterBar({
             </SelectContent>
           </Select>
 
-          {/* Sort */}
-          <Select value={sortBy} onValueChange={onSortByChange}>
-            <SelectTrigger size="sm" className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="recommended">{"推荐排序"}</SelectItem>
-              <SelectItem value="time">{"时间排序"}</SelectItem>
-              <SelectItem value="score">{"分数排序"}</SelectItem>
-            </SelectContent>
-          </Select>
-
           {/* View mode toggle */}
           <div className="flex rounded-lg border border-border overflow-hidden">
             {viewModes.map((mode) => (
@@ -126,17 +104,6 @@ export function FilterBar({
               </button>
             ))}
           </div>
-
-          {/* Featured toggle */}
-          <Button
-            variant={featuredOnly ? "default" : "outline"}
-            size="sm"
-            className="h-8 text-xs gap-1"
-            onClick={() => onFeaturedOnlyChange(!featuredOnly)}
-          >
-            <Star className={cn("size-3", featuredOnly && "fill-current")} />
-            {"精选"}
-          </Button>
 
           {/* Search */}
           <div className="relative ml-auto">
