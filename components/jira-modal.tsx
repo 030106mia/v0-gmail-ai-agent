@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Copy, Plus } from "lucide-react"
-import type { EmailItem } from "@/lib/mock-data"
+import type { EmailItem } from "@/lib/types"
 
 interface JiraModalProps {
   email: EmailItem | null

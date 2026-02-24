@@ -4,8 +4,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Mail, ExternalLink, CheckCircle2, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { EmailItem, EmailStatus } from "@/lib/mock-data"
-import { statusLabels } from "@/lib/mock-data"
+import type { EmailItem, EmailStatus } from "@/lib/types"
+import { statusLabels } from "@/lib/types"
 
 interface EmailCardProps {
   email: EmailItem

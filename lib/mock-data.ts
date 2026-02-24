@@ -1,21 +1,6 @@
-export type EmailStatus = "pending" | "replied" | "jira_created" | "completed"
-
-export interface EmailItem {
-  id: string
-  fromName: string
-  fromEmail: string
-  avatarLetter: string
-  avatarColor: string
-  subject: string
-  originalBody: string
-  translatedZh: string
-  tags: string[]
-  receivedAt: string
-  score: number
-  isNew: boolean
-  status: EmailStatus
-  language: string
-}
+import type { EmailItem } from "./types"
+export type { EmailItem, EmailStatus } from "./types"
+export { statusLabels } from "./types"
 
 export const mockEmails: EmailItem[] = [
   {
@@ -415,13 +400,6 @@ Emily Watson
     language: "日文",
   },
 ]
-
-export const statusLabels: Record<EmailStatus, string> = {
-  pending: "待处理",
-  replied: "已回信",
-  jira_created: "已录入Jira",
-  completed: "已完成",
-}
 
 export const statusCounts = {
   pending: mockEmails.filter((e) => e.status === "pending").length,

@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Copy, Save, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { EmailItem } from "@/lib/mock-data"
+import type { EmailItem } from "@/lib/types"
 
 interface ReplyDrawerProps {
   email: EmailItem | null

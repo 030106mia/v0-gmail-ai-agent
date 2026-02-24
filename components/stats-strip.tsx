@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils"
 import { Clock, CheckCircle2, Ticket, CircleCheckBig } from "lucide-react"
-import type { EmailStatus } from "@/lib/mock-data"
+import type { EmailStatus } from "@/lib/types"
 
 interface StatsStripProps {
   counts: Record<EmailStatus, number>
