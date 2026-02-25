@@ -87,8 +87,8 @@ export function FilterBar({
             </SelectContent>
           </Select>
 
-          {/* View mode toggle */}
-          <div className="flex rounded-lg border border-border overflow-hidden">
+          {/* View mode toggle - hidden for now */}
+          {/* <div className="flex rounded-lg border border-border overflow-hidden">
             {viewModes.map((mode) => (
               <button
                 key={mode.value}
@@ -103,7 +103,7 @@ export function FilterBar({
                 {mode.label}
               </button>
             ))}
-          </div>
+          </div> */}
 
           {/* Search */}
           <div className="relative ml-auto">
