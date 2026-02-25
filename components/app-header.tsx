@@ -11,7 +11,7 @@ export function AppHeader() {
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
             <Mail className="size-4 text-primary-foreground" />
           </div>
-          <span className="text-base font-bold text-card-foreground tracking-tight">Gmail AI Agent</span>
+          <span className="text-base font-bold text-card-foreground tracking-tight">Support AI Agent</span>
         </div>
 
         {/* Right: placeholder */}
