@@ -117,22 +117,28 @@ const MOCK_EMAILS: EmailItem[] = [
     receivedAt: "1天前",
     score: 65,
     isNew: false,
-    status: "jira",
+    status: "jira_created",
     language: "英文",
   },
 ]
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+
+    const knownIdsParam = searchParams.get("knownIds")
+    const knownIds = knownIdsParam
+      ? new Set(knownIdsParam.split(",").filter(Boolean))
+      : undefined
+
     if (!hasGmailCredentials()) {
-      const analyzed = await analyzeEmails(MOCK_EMAILS)
+      const analyzed = await analyzeEmails(MOCK_EMAILS, knownIds)
       return NextResponse.json({
         emails: analyzed,
         fetchedAt: new Date().toISOString(),
       })
     }
 
-    const { searchParams } = new URL(request.url)
     const maxResults = Math.min(
       Number(searchParams.get("maxResults") ?? 20),
       50
@@ -140,7 +146,10 @@ export async function GET(request: NextRequest) {
 
     const { fetchEmailsByLabels } = await import("@/lib/gmail")
     const rawEmails = await fetchEmailsByLabels(maxResults)
-    const emails = await analyzeEmails(rawEmails)
+    const filtered = rawEmails.filter(
+      (e) => e.fromEmail.toLowerCase() !== "mia@filomail.com",
+    )
+    const emails = await analyzeEmails(filtered, knownIds)
     return NextResponse.json({ emails, fetchedAt: new Date().toISOString() })
   } catch (error) {
     console.error("Failed to fetch emails:", error)

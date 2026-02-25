@@ -41,8 +41,24 @@ ID: ${e.id}
   return `请分析以下 ${emails.length} 封邮件：\n\n${summaries.join("\n")}`
 }
 
-export async function analyzeEmails(emails: EmailItem[]): Promise<EmailItem[]> {
+export async function analyzeEmails(
+  emails: EmailItem[],
+  knownIds?: Set<string>,
+): Promise<EmailItem[]> {
   if (!DEEPSEEK_API_KEY || emails.length === 0) return emails
+
+  const unknownEmails = knownIds
+    ? emails.filter((e) => !knownIds.has(e.id))
+    : emails
+
+  if (unknownEmails.length === 0) {
+    console.log(`[AI] All ${emails.length} emails cached, skipping Deepseek call`)
+    return emails
+  }
+
+  console.log(
+    `[AI] Analyzing ${unknownEmails.length} new emails (${emails.length - unknownEmails.length} cached)`,
+  )
 
   try {
     const res = await fetch(`${DEEPSEEK_API_URL}/v1/chat/completions`, {
@@ -55,7 +71,7 @@ export async function analyzeEmails(emails: EmailItem[]): Promise<EmailItem[]> {
         model: "deepseek-chat",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: buildUserPrompt(emails) },
+          { role: "user", content: buildUserPrompt(unknownEmails) },
         ],
         temperature: 0.1,
         max_tokens: 2048,
@@ -84,10 +100,12 @@ export async function analyzeEmails(emails: EmailItem[]): Promise<EmailItem[]> {
 
     return emails
       .filter((e) => {
+        if (knownIds?.has(e.id)) return true
         const r = resultMap.get(e.id)
         return r ? r.visible !== false : true
       })
       .map((e) => {
+        if (knownIds?.has(e.id)) return e
         const r = resultMap.get(e.id)
         return r ? { ...e, score: Math.max(0, Math.min(100, r.score)) } : e
       })

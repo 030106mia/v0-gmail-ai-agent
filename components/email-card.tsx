@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Mail, ExternalLink, CheckCircle2, Sparkles, ChevronDown, ChevronUp } from "lucide-react"
+import { Mail, CheckCircle2, ChevronDown, ChevronUp, Languages, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { EmailItem, EmailStatus } from "@/lib/types"
 import { statusLabels } from "@/lib/types"
@@ -16,8 +16,9 @@ interface EmailCardProps {
 }
 
 function getScoreColor(score: number) {
-  if (score >= 90) return "text-destructive bg-destructive/10 border-destructive/20"
-  if (score >= 70) return "text-warning-foreground bg-warning/20 border-warning/30"
+  if (score >= 80) return "text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-950 dark:border-red-800"
+  if (score >= 65) return "text-orange-600 bg-orange-50 border-orange-200 dark:text-orange-400 dark:bg-orange-950 dark:border-orange-800"
+  if (score >= 40) return "text-yellow-600 bg-yellow-50 border-yellow-200 dark:text-yellow-400 dark:bg-yellow-950 dark:border-yellow-800"
   return "text-muted-foreground bg-muted border-border"
 }
 
@@ -81,14 +82,45 @@ function ExpandableText({ text, className }: { text: string; className?: string 
 }
 
 export function EmailCard({ email, onGenerateReply, onCreateJira, onMarkProcessed }: EmailCardProps) {
+  const [translation, setTranslation] = useState(email.translatedZh || "")
+  const [translating, setTranslating] = useState(false)
+  const [showTranslation, setShowTranslation] = useState(false)
+
+  const handleTranslate = async () => {
+    if (translation) {
+      setShowTranslation(!showTranslation)
+      return
+    }
+
+    setShowTranslation(true)
+    setTranslating(true)
+    try {
+      const res = await fetch("/api/ai/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: email.originalBody }),
+      })
+      const data = await res.json()
+      if (data.translation) {
+        setTranslation(data.translation)
+      }
+    } catch {
+      setTranslation("翻译失败，请重试")
+    } finally {
+      setTranslating(false)
+    }
+  }
+
   return (
     <article className="group rounded-xl border border-border bg-card shadow-sm hover:shadow-md transition-shadow">
-      {/* Card header */}
       <div className="p-5 pb-3 space-y-2.5">
-        {/* Row 1: Subject */}
-        <h3 className="text-sm font-semibold leading-snug text-card-foreground truncate">{email.subject}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-card-foreground truncate">{email.subject}</h3>
+          <div className={cn("shrink-0 flex items-center justify-center rounded-lg border px-2.5 py-1 text-xs font-bold tabular-nums", getScoreColor(email.score))}>
+            {email.score}
+          </div>
+        </div>
 
-        {/* Row 2: Avatar + Info + Time/Score */}
         <div className="flex items-center gap-3">
           <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-primary-foreground", email.avatarColor)}>
             {email.avatarLetter}
@@ -97,22 +129,10 @@ export function EmailCard({ email, onGenerateReply, onCreateJira, onMarkProcesse
             <p className="text-sm font-medium text-card-foreground truncate">{email.fromName}</p>
             <p className="text-xs text-muted-foreground truncate">{email.fromEmail}</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[11px] text-muted-foreground whitespace-nowrap">{email.receivedAt}</span>
-            <div className={cn("flex items-center justify-center rounded-lg border px-2.5 py-1 text-xs font-bold tabular-nums", getScoreColor(email.score))}>
-              {email.score}
-            </div>
-            {email.isNew && (
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
-                <Sparkles className="size-2.5" />
-                New
-              </span>
-            )}
-          </div>
+          <span className="shrink-0 text-[11px] text-muted-foreground whitespace-nowrap">{email.receivedAt}</span>
         </div>
       </div>
 
-      {/* Original email */}
       <div className="mx-5 rounded-lg border border-border bg-muted/50 p-3">
         <div className="flex items-center gap-1.5 mb-1.5">
           <Mail className="size-3 text-muted-foreground" />
@@ -124,22 +144,28 @@ export function EmailCard({ email, onGenerateReply, onCreateJira, onMarkProcesse
         <ExpandableText text={email.originalBody} className="text-card-foreground/80" />
       </div>
 
-      {/* Translation */}
-      <div className="mx-5 mt-2.5 rounded-lg border border-translation-border/30 bg-translation-bg p-3">
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="text-[10px] font-medium uppercase tracking-wide text-primary">{"中文翻译"}</span>
-          <button className="ml-auto text-[10px] text-muted-foreground hover:text-primary transition-colors">
-            {"重新翻译"}
-          </button>
+      {showTranslation && (
+        <div className="mx-5 mt-2.5 rounded-lg border border-translation-border/30 bg-translation-bg p-3">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Languages className="size-3 text-primary" />
+            <span className="text-[10px] font-medium uppercase tracking-wide text-primary">{"中文翻译"}</span>
+          </div>
+          {translating ? (
+            <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" />
+              {"正在翻译..."}
+            </div>
+          ) : (
+            <ExpandableText text={translation} className="text-card-foreground" />
+          )}
         </div>
-        <ExpandableText text={email.translatedZh} className="text-card-foreground" />
-      </div>
+      )}
 
-      {/* Card footer actions */}
       <div className="flex items-center gap-2 p-5 pt-3">
         <Button
+          variant="outline"
           size="sm"
-          className="flex-1 text-xs h-8"
+          className="flex-1 text-xs h-8 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
           onClick={() => onGenerateReply(email)}
         >
           <Mail className="size-3.5" />
@@ -157,10 +183,16 @@ export function EmailCard({ email, onGenerateReply, onCreateJira, onMarkProcesse
           variant="ghost"
           size="icon-sm"
           className="shrink-0"
-          title="查看原邮件"
+          title={showTranslation ? "收起翻译" : "翻译"}
+          onClick={handleTranslate}
+          disabled={translating}
         >
-          <ExternalLink className="size-3.5" />
-          <span className="sr-only">{"查看原邮件"}</span>
+          {translating ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Languages className="size-3.5" />
+          )}
+          <span className="sr-only">{"翻译"}</span>
         </Button>
         {email.status === "pending" && (
           <Button

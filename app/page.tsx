@@ -1,15 +1,56 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { AppHeader } from "@/components/app-header"
 import { FilterBar } from "@/components/filter-bar"
-import { Clock, CheckCircle2, Ticket, CircleCheckBig, RefreshCw, AlertCircle, Loader2 } from "lucide-react"
+import { Clock, CheckCircle2, Ticket, CircleCheckBig, RefreshCw, AlertCircle, Loader2, ArrowDownWideNarrow, Timer } from "lucide-react"
 import { EmailCard } from "@/components/email-card"
 import { ReplyDrawer } from "@/components/reply-drawer"
 import { JiraModal } from "@/components/jira-modal"
 import type { EmailItem, EmailStatus } from "@/lib/types"
+import { cn } from "@/lib/utils"
+
+const CACHE_KEY_SCORES = "gmail_ai_scores"
+const CACHE_KEY_STATUS = "gmail_ai_status"
+const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+interface CachedScore {
+  score: number
+  ts: number
+}
+
+interface CachedStatus {
+  status: EmailStatus
+  isNew: boolean
+  ts: number
+}
+
+function loadCache<T>(key: string): Record<string, T> {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveCache<T>(key: string, data: Record<string, T>) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data))
+  } catch {}
+}
+
+function loadCachedScores(): Record<string, CachedScore> {
+  const data = loadCache<CachedScore>(CACHE_KEY_SCORES)
+  const now = Date.now()
+  const cleaned: Record<string, CachedScore> = {}
+  for (const [id, entry] of Object.entries(data)) {
+    if (now - entry.ts < CACHE_MAX_AGE_MS) cleaned[id] = entry
+  }
+  return cleaned
+}
 
 const tabItems = [
   { value: "pending", countKey: "pending" as const, label: "待处理", icon: Clock, colorClass: "text-primary", activeClass: "bg-primary/10 text-primary border-primary/30" },
@@ -40,26 +81,47 @@ export default function GmailAgentPage() {
   const [error, setError] = useState<string | null>(null)
   const [fetchedAt, setFetchedAt] = useState<string | null>(null)
 
+  const scoresCacheRef = useRef<Record<string, CachedScore>>({})
+
   const fetchEmails = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
     else setLoading(true)
     setError(null)
 
     try {
-      const res = await fetch("/api/emails?maxResults=30")
+      const cachedScores = loadCachedScores()
+      scoresCacheRef.current = cachedScores
+      const knownIds = Object.keys(cachedScores)
+      const params = new URLSearchParams({ maxResults: "30" })
+      if (knownIds.length > 0) {
+        params.set("knownIds", knownIds.join(","))
+      }
+
+      const res = await fetch(`/api/emails?${params}`)
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || `请求失败 (${res.status})`)
       }
       const data = await res.json()
-      setEmails((prev) => {
-        const statusMap = new Map(prev.map((e) => [e.id, e.status]))
-        return data.emails.map((e: EmailItem) => ({
-          ...e,
-          status: statusMap.get(e.id) ?? e.status,
-        }))
-      })
+
+      const cachedStatus = loadCache<CachedStatus>(CACHE_KEY_STATUS)
+
+      const mergedEmails = (data.emails as EmailItem[]).map((e) => ({
+        ...e,
+        score: cachedScores[e.id]?.score ?? e.score,
+        status: cachedStatus[e.id]?.status ?? e.status,
+        isNew: cachedStatus[e.id] !== undefined ? cachedStatus[e.id].isNew : e.isNew,
+      }))
+
+      setEmails(mergedEmails)
       setFetchedAt(data.fetchedAt)
+
+      const updatedScores = { ...cachedScores }
+      for (const e of mergedEmails) {
+        updatedScores[e.id] = { score: e.score, ts: Date.now() }
+      }
+      saveCache(CACHE_KEY_SCORES, updatedScores)
+      scoresCacheRef.current = updatedScores
     } catch (err) {
       setError(err instanceof Error ? err.message : "获取邮件失败")
     } finally {
@@ -78,6 +140,7 @@ export default function GmailAgentPage() {
   const [languageFilter, setLanguageFilter] = useState("all")
   const [viewMode, setViewMode] = useState("card")
   const [searchQuery, setSearchQuery] = useState("")
+  const [sortBy, setSortBy] = useState<"time" | "score">("time")
 
   // Tab state
   const [activeTab, setActiveTab] = useState("pending")
@@ -125,17 +188,26 @@ export default function GmailAgentPage() {
       )
     }
 
-    return result
-  }, [emails, activeTab, statusFilter, languageFilter, searchQuery])
+    if (sortBy === "score") {
+      result.sort((a, b) => b.score - a.score)
+    }
 
-  // Actions
+    return result
+  }, [emails, activeTab, statusFilter, languageFilter, searchQuery, sortBy])
+
+  const persistStatus = useCallback((id: string, status: EmailStatus, isNew: boolean) => {
+    const cached = loadCache<CachedStatus>(CACHE_KEY_STATUS)
+    cached[id] = { status, isNew, ts: Date.now() }
+    saveCache(CACHE_KEY_STATUS, cached)
+  }, [])
+
   const handleGenerateReply = (email: EmailItem) => {
     setReplyEmail(email)
     setReplyOpen(true)
-    // Mark as no longer new
     setEmails((prev) =>
       prev.map((e) => (e.id === email.id ? { ...e, isNew: false } : e))
     )
+    persistStatus(email.id, email.status, false)
   }
 
   const handleCreateJira = (email: EmailItem) => {
@@ -144,24 +216,28 @@ export default function GmailAgentPage() {
     setEmails((prev) =>
       prev.map((e) => (e.id === email.id ? { ...e, isNew: false } : e))
     )
+    persistStatus(email.id, email.status, false)
   }
 
   const handleSaveAsReplied = (id: string) => {
     setEmails((prev) =>
       prev.map((e) => (e.id === id ? { ...e, status: "replied" as EmailStatus } : e))
     )
+    persistStatus(id, "replied", false)
   }
 
   const handleSaveAsJiraCreated = (id: string) => {
     setEmails((prev) =>
       prev.map((e) => (e.id === id ? { ...e, status: "jira_created" as EmailStatus } : e))
     )
+    persistStatus(id, "jira_created", false)
   }
 
   const handleMarkProcessed = (id: string) => {
     setEmails((prev) =>
       prev.map((e) => (e.id === id ? { ...e, status: "completed" as EmailStatus } : e))
     )
+    persistStatus(id, "completed", false)
   }
 
   return (
@@ -226,12 +302,40 @@ export default function GmailAgentPage() {
                     })}
                   </TabsList>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     {fetchedAt && (
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-[10px] text-muted-foreground mr-1">
                         {"更新于 "}{new Date(fetchedAt).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                       </span>
                     )}
+                    <div className="flex items-center rounded-lg border border-border bg-muted/50 p-0.5">
+                      <button
+                        onClick={() => setSortBy("time")}
+                        className={cn(
+                          "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
+                          sortBy === "time"
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                        title="按时间排序"
+                      >
+                        <Timer className="size-3" />
+                        {"时间"}
+                      </button>
+                      <button
+                        onClick={() => setSortBy("score")}
+                        className={cn(
+                          "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
+                          sortBy === "score"
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                        title="按分数排序"
+                      >
+                        <ArrowDownWideNarrow className="size-3" />
+                        {"分数"}
+                      </button>
+                    </div>
                     <Button
                       variant="ghost"
                       size="icon-sm"
