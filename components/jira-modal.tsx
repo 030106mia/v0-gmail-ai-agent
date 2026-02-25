@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import {
   Dialog,
   DialogContent,
@@ -38,7 +38,7 @@ interface JiraModalProps {
   email: EmailItem | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreateJira: (id: string) => void
+  onCreateJira: (id: string, jiraKey: string) => void
 }
 
 export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModalProps) {
@@ -59,6 +59,9 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
   const [createError, setCreateError] = useState<string | null>(null)
   const [createdIssue, setCreatedIssue] = useState<{ key: string; url: string } | null>(null)
 
+  const metaLoadedRef = useRef(false)
+  metaLoadedRef.current = metaLoaded
+
   const fetchMetadata = useCallback(async () => {
     setLoadingMeta(true)
     setMetaError(null)
@@ -75,6 +78,7 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
       if (data.priorities) setPriorities(data.priorities)
       if (data.issueTypes) setIssueTypes(data.issueTypes)
       setMetaLoaded(true)
+      metaLoadedRef.current = true
     } catch {
       setMetaError("网络错误，无法连接 Jira")
     } finally {
@@ -82,8 +86,8 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
     }
   }, [])
 
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen && email) {
+  useEffect(() => {
+    if (open && email) {
       setTitle(email.subject)
       setDescription(
         `## 原始邮件\n发件人: ${email.fromName} <${email.fromEmail}>\n\n${email.originalBody}\n\n---\n\n## 中文翻译\n\n${email.translatedZh}`
@@ -91,13 +95,14 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
       setCopied(false)
       setCreateError(null)
       setCreatedIssue(null)
+      setIssueType("Task")
+      setPriority("Medium")
 
-      if (!metaLoaded) {
+      if (!metaLoadedRef.current) {
         fetchMetadata()
       }
     }
-    onOpenChange(nextOpen)
-  }
+  }, [open, email, fetchMetadata])
 
   const handleCreate = async () => {
     if (!email || !title) return
@@ -123,7 +128,7 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
       }
 
       setCreatedIssue({ key: data.key, url: data.url })
-      onCreateJira(email.id)
+      onCreateJira(email.id, data.key)
     } catch {
       setCreateError("网络错误，无法创建 Jira 工单")
     } finally {
@@ -140,7 +145,7 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
   if (!email) return null
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="text-base">{"录入 Jira 工单"}</DialogTitle>

@@ -88,6 +88,16 @@ export async function getPriorities(): Promise<JiraPriority[]> {
   return data.map((p) => ({ id: p.id, name: p.name }))
 }
 
+export async function verifyIssueKeys(keys: string[]): Promise<string[]> {
+  if (keys.length === 0) return []
+
+  const jql = `key in (${keys.join(",")})`
+  const data = await jiraFetch<{ issues: { key: string }[] }>(
+    `/search?jql=${encodeURIComponent(jql)}&fields=key&maxResults=${keys.length}`,
+  )
+  return data.issues.map((i) => i.key)
+}
+
 export async function createIssue(params: CreateIssueParams): Promise<CreatedIssue> {
   const body = {
     fields: {

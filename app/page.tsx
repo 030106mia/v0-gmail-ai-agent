@@ -25,6 +25,7 @@ interface CachedStatus {
   status: EmailStatus
   isNew: boolean
   ts: number
+  jiraKey?: string
 }
 
 function loadCache<T>(key: string): Record<string, T> {
@@ -83,6 +84,55 @@ export default function GmailAgentPage() {
 
   const scoresCacheRef = useRef<Record<string, CachedScore>>({})
 
+  const verifyJiraStatuses = useCallback(async (
+    cachedStatus: Record<string, CachedStatus>,
+    currentEmails: EmailItem[],
+  ) => {
+    const jiraEntries = Object.entries(cachedStatus).filter(
+      ([, v]) => v.status === "jira_created" && v.jiraKey,
+    )
+    if (jiraEntries.length === 0) return
+
+    try {
+      const keys = jiraEntries.map(([, v]) => v.jiraKey!)
+      const res = await fetch("/api/jira/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keys }),
+      })
+      if (!res.ok) return
+
+      const { existingKeys } = await res.json() as { existingKeys: string[] }
+      const existingSet = new Set(existingKeys)
+
+      const deletedIds = new Set(
+        jiraEntries
+          .filter(([, v]) => !existingSet.has(v.jiraKey!))
+          .map(([id]) => id),
+      )
+      if (deletedIds.size === 0) return
+
+      const emailIds = new Set(currentEmails.map((e) => e.id))
+      const revertIds = new Set([...deletedIds].filter((id) => emailIds.has(id)))
+
+      if (revertIds.size > 0) {
+        setEmails((prev) =>
+          prev.map((e) =>
+            revertIds.has(e.id) ? { ...e, status: "pending" as EmailStatus } : e,
+          ),
+        )
+      }
+
+      const updated = { ...cachedStatus }
+      for (const id of deletedIds) {
+        updated[id] = { ...updated[id], status: "pending", jiraKey: undefined }
+      }
+      saveCache(CACHE_KEY_STATUS, updated)
+    } catch {
+      // 验证失败时静默忽略，不影响正常使用
+    }
+  }, [])
+
   const fetchEmails = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
     else setLoading(true)
@@ -122,6 +172,8 @@ export default function GmailAgentPage() {
       }
       saveCache(CACHE_KEY_SCORES, updatedScores)
       scoresCacheRef.current = updatedScores
+
+      verifyJiraStatuses(cachedStatus, mergedEmails)
     } catch (err) {
       setError(err instanceof Error ? err.message : "获取邮件失败")
     } finally {
@@ -195,9 +247,10 @@ export default function GmailAgentPage() {
     return result
   }, [emails, activeTab, statusFilter, languageFilter, searchQuery, sortBy])
 
-  const persistStatus = useCallback((id: string, status: EmailStatus, isNew: boolean) => {
+  const persistStatus = useCallback((id: string, status: EmailStatus, isNew: boolean, jiraKey?: string) => {
     const cached = loadCache<CachedStatus>(CACHE_KEY_STATUS)
-    cached[id] = { status, isNew, ts: Date.now() }
+    const prev = cached[id]
+    cached[id] = { status, isNew, ts: Date.now(), jiraKey: jiraKey ?? prev?.jiraKey }
     saveCache(CACHE_KEY_STATUS, cached)
   }, [])
 
@@ -226,11 +279,11 @@ export default function GmailAgentPage() {
     persistStatus(id, "replied", false)
   }
 
-  const handleSaveAsJiraCreated = (id: string) => {
+  const handleSaveAsJiraCreated = (id: string, jiraKey: string) => {
     setEmails((prev) =>
       prev.map((e) => (e.id === id ? { ...e, status: "jira_created" as EmailStatus } : e))
     )
-    persistStatus(id, "jira_created", false)
+    persistStatus(id, "jira_created", false, jiraKey)
   }
 
   const handleMarkProcessed = (id: string) => {
