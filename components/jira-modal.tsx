@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Copy, Plus, Loader2, ExternalLink, AlertCircle, Lock } from "lucide-react"
+import { Copy, Plus, Loader2, ExternalLink, AlertCircle, Lock, Sparkles } from "lucide-react"
 import type { EmailItem } from "@/lib/types"
 
 interface JiraIssueType {
@@ -54,6 +54,9 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
   const [loadingMeta, setLoadingMeta] = useState(false)
   const [metaError, setMetaError] = useState<string | null>(null)
   const [metaLoaded, setMetaLoaded] = useState(false)
+
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
 
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -89,12 +92,11 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
   useEffect(() => {
     if (open && email) {
       setTitle(email.subject)
-      setDescription(
-        `## 原始邮件\n发件人: ${email.fromName} <${email.fromEmail}>\n\n${email.originalBody}\n\n---\n\n## 中文翻译\n\n${email.translatedZh}`
-      )
+      setDescription("")
       setCopied(false)
       setCreateError(null)
       setCreatedIssue(null)
+      setAiError(null)
       setIssueType("Task")
       setPriority("Medium")
 
@@ -103,6 +105,39 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
       }
     }
   }, [open, email, fetchMetadata])
+
+  const handleAiGenerate = async () => {
+    if (!email) return
+
+    setAiGenerating(true)
+    setAiError(null)
+    try {
+      const res = await fetch("/api/ai/jira", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromName: email.fromName,
+          fromEmail: email.fromEmail,
+          subject: email.subject,
+          body: email.originalBody,
+          translatedBody: email.translatedZh,
+        }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setAiError(data.error || "AI 生成失败")
+        return
+      }
+
+      if (data.title) setTitle(data.title)
+      if (data.description) setDescription(data.description)
+    } catch {
+      setAiError("网络错误，无法调用 AI")
+    } finally {
+      setAiGenerating(false)
+    }
+  }
 
   const handleCreate = async () => {
     if (!email || !title) return
@@ -146,7 +181,7 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base">{"录入 Jira 工单"}</DialogTitle>
           <DialogDescription className="text-xs">
@@ -185,7 +220,7 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
                 <Lock className="size-3.5 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">{"目标项目"}</span>
                 <Badge variant="secondary" className="text-xs font-mono">
-                  {loadingMeta ? "加载中..." : projectKey || "—"}
+                  {loadingMeta ? "加载中..." : projectKey || "FILO"}
                 </Badge>
                 <span className="text-[10px] text-muted-foreground ml-auto">{"Backlog"}</span>
               </div>
@@ -241,6 +276,33 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
                 </div>
               </div>
 
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs h-8 border-dashed"
+                onClick={handleAiGenerate}
+                disabled={aiGenerating || !email}
+              >
+                {aiGenerating ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    {"AI 生成中..."}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="size-3.5" />
+                    {"AI 写工单"}
+                  </>
+                )}
+              </Button>
+
+              {aiError && (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600">
+                  <AlertCircle className="size-3.5 shrink-0" />
+                  <span>{aiError}</span>
+                </div>
+              )}
+
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs text-muted-foreground">{"标题"}</Label>
                 <Input
@@ -265,7 +327,7 @@ export function JiraModal({ email, open, onOpenChange, onCreateJira }: JiraModal
                 <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="min-h-[160px] text-xs leading-relaxed resize-none"
+                  className="min-h-[120px] max-h-[200px] text-xs leading-relaxed resize-none overflow-y-auto"
                 />
               </div>
 
