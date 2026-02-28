@@ -39,6 +39,7 @@ async function loadCacheFromDB(): Promise<{
 function saveCacheToDB(payload: {
   scores?: Record<string, { score: number; ts: number }>
   status?: { emailId: string; status: string; isNew: boolean; jiraKey?: string }
+  emails?: Record<string, { subject?: string; fromName?: string; fromEmail?: string; originalBody?: string; translatedZh?: string; language?: string; receivedAt?: string }>
 }) {
   fetch("/api/cache", {
     method: "POST",
@@ -162,10 +163,20 @@ export function EmailBoard() {
       setFetchedAt(data.fetchedAt)
 
       const updatedScores: Record<string, { score: number; ts: number }> = {}
+      const emailContents: Record<string, { subject?: string; fromName?: string; fromEmail?: string; originalBody?: string; translatedZh?: string; language?: string; receivedAt?: string }> = {}
       for (const e of mergedEmails) {
         updatedScores[e.id] = { score: e.score, ts: Date.now() }
+        emailContents[e.id] = {
+          subject: e.subject,
+          fromName: e.fromName,
+          fromEmail: e.fromEmail,
+          originalBody: e.originalBody,
+          translatedZh: e.translatedZh,
+          language: e.language,
+          receivedAt: e.receivedAt,
+        }
       }
-      saveCacheToDB({ scores: updatedScores })
+      saveCacheToDB({ scores: updatedScores, emails: emailContents })
       scoresCacheRef.current = { ...cachedScores, ...updatedScores }
 
       verifyJiraStatuses(cachedStatus, mergedEmails)

@@ -8,13 +8,20 @@ datasource db {
 }
 
 model EmailCache {
-  emailId   String   @id
-  score     Float?
-  scoredAt  DateTime?
-  status    String   @default("pending")
-  isNew     Boolean  @default(true)
-  jiraKey   String?
-  updatedAt DateTime @updatedAt
+  emailId      String   @id
+  score        Float?
+  scoredAt     DateTime?
+  status       String   @default("pending")
+  isNew        Boolean  @default(true)
+  jiraKey      String?
+  subject      String?
+  fromName     String?
+  fromEmail    String?
+  originalBody String?
+  translatedZh String?
+  language     String?
+  receivedAt   String?
+  updatedAt    DateTime @updatedAt
 }
 
 model RequirementTicket {

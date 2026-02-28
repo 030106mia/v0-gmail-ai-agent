@@ -32,22 +32,59 @@ export async function GET() {
   }
 }
 
+interface EmailContent {
+  subject?: string
+  fromName?: string
+  fromEmail?: string
+  originalBody?: string
+  translatedZh?: string
+  language?: string
+  receivedAt?: string
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { scores, status } = body as {
+    const { scores, status, emails } = body as {
       scores?: Record<string, { score: number; ts: number }>
       status?: { emailId: string; status: string; isNew: boolean; jiraKey?: string }
+      emails?: Record<string, EmailContent>
     }
 
     if (scores) {
-      const upserts = Object.entries(scores).map(([emailId, { score, ts }]) =>
-        prisma.emailCache.upsert({
+      const upserts = Object.entries(scores).map(([emailId, { score, ts }]) => {
+        const emailData = emails?.[emailId]
+        return prisma.emailCache.upsert({
           where: { emailId },
-          update: { score, scoredAt: new Date(ts) },
-          create: { emailId, score, scoredAt: new Date(ts) },
+          update: {
+            score,
+            scoredAt: new Date(ts),
+            ...(emailData ? {
+              subject: emailData.subject,
+              fromName: emailData.fromName,
+              fromEmail: emailData.fromEmail,
+              originalBody: emailData.originalBody,
+              translatedZh: emailData.translatedZh,
+              language: emailData.language,
+              receivedAt: emailData.receivedAt,
+            } : {}),
+          },
+          create: {
+            emailId,
+            score,
+            scoredAt: new Date(ts),
+            ...(emailData ? {
+              subject: emailData.subject,
+              fromName: emailData.fromName,
+              fromEmail: emailData.fromEmail,
+              originalBody: emailData.originalBody,
+              translatedZh: emailData.translatedZh,
+              language: emailData.language,
+              receivedAt: emailData.receivedAt,
+            } : {}),
+          },
         })
-      )
+      })
       await prisma.$transaction(upserts)
     }
 
