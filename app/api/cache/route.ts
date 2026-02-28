@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 
+export const dynamic = "force-dynamic"
+
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 export async function GET() {
