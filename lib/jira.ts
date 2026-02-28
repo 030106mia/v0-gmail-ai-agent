@@ -98,6 +98,102 @@ export async function verifyIssueKeys(keys: string[]): Promise<string[]> {
   return data.issues.map((i) => i.key)
 }
 
+type AdfNode = Record<string, unknown>
+
+function parseInlineMarks(text: string): AdfNode[] {
+  const nodes: AdfNode[] = []
+  const regex = /\*\*(.+?)\*\*|__(.+?)__|`(.+?)`/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push({ type: "text", text: text.slice(lastIndex, match.index) })
+    }
+    if (match[1] || match[2]) {
+      nodes.push({ type: "text", text: match[1] || match[2], marks: [{ type: "strong" }] })
+    } else if (match[3]) {
+      nodes.push({ type: "text", text: match[3], marks: [{ type: "code" }] })
+    }
+    lastIndex = regex.lastIndex
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push({ type: "text", text: text.slice(lastIndex) })
+  }
+
+  return nodes.length > 0 ? nodes : [{ type: "text", text: text || " " }]
+}
+
+function markdownToAdf(markdown: string): AdfNode {
+  const lines = markdown.split("\n")
+  const content: AdfNode[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    if (line.trim() === "") {
+      i++
+      continue
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/)
+    if (headingMatch) {
+      content.push({
+        type: "heading",
+        attrs: { level: headingMatch[1].length },
+        content: parseInlineMarks(headingMatch[2]),
+      })
+      i++
+      continue
+    }
+
+    const bulletMatch = line.match(/^(\s*)[-*]\s+(.+)$/)
+    if (bulletMatch) {
+      const items: AdfNode[] = []
+      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+        const m = lines[i].match(/^\s*[-*]\s+(.+)$/)
+        if (m) {
+          items.push({
+            type: "listItem",
+            content: [{ type: "paragraph", content: parseInlineMarks(m[1]) }],
+          })
+        }
+        i++
+      }
+      content.push({ type: "bulletList", content: items })
+      continue
+    }
+
+    const orderedMatch = line.match(/^\s*\d+[.)]\s+(.+)$/)
+    if (orderedMatch) {
+      const items: AdfNode[] = []
+      while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) {
+        const m = lines[i].match(/^\s*\d+[.)]\s+(.+)$/)
+        if (m) {
+          items.push({
+            type: "listItem",
+            content: [{ type: "paragraph", content: parseInlineMarks(m[1]) }],
+          })
+        }
+        i++
+      }
+      content.push({ type: "orderedList", content: items })
+      continue
+    }
+
+    content.push({ type: "paragraph", content: parseInlineMarks(line) })
+    i++
+  }
+
+  if (content.length === 0) {
+    content.push({ type: "paragraph", content: [{ type: "text", text: " " }] })
+  }
+
+  return { type: "doc", version: 1, content }
+}
+
 export async function createIssue(params: CreateIssueParams): Promise<CreatedIssue> {
   const body = {
     fields: {
@@ -105,16 +201,7 @@ export async function createIssue(params: CreateIssueParams): Promise<CreatedIss
       issuetype: { name: params.issueTypeName },
       priority: { name: params.priorityName },
       summary: params.summary,
-      description: {
-        type: "doc",
-        version: 1,
-        content: params.description.split("\n").map((line) => ({
-          type: "paragraph",
-          content: line
-            ? [{ type: "text", text: line }]
-            : [{ type: "text", text: " " }],
-        })),
-      },
+      description: markdownToAdf(params.description),
     },
   }
 
