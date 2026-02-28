@@ -1,36 +1,40 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_URL || "https://api.deepseek.com"
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || ""
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ""
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514"
 
-async function callDeepseek(messages: { role: string; content: string }[]) {
-  const res = await fetch(`${DEEPSEEK_API_URL}/v1/chat/completions`, {
+async function callClaude(system: string, userContent: string, options?: { temperature?: number; max_tokens?: number }) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "deepseek-chat",
-      messages,
-      temperature: 0.7,
-      max_tokens: 1024,
+      model: ANTHROPIC_MODEL,
+      max_tokens: options?.max_tokens ?? 1024,
+      temperature: options?.temperature ?? 0.7,
+      system,
+      messages: [
+        { role: "user", content: userContent },
+      ],
     }),
   })
 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}))
-    console.error("Deepseek API error:", errData)
-    throw new Error(errData.error?.message || `Deepseek API 请求失败 (${res.status})`)
+    console.error("Claude API error:", errData)
+    throw new Error(errData.error?.message || `Claude API 请求失败 (${res.status})`)
   }
 
   const data = await res.json()
-  return data.choices?.[0]?.message?.content?.trim() || ""
+  return data.content?.[0]?.text?.trim() || ""
 }
 
 export async function POST(req: NextRequest) {
-  if (!DEEPSEEK_API_KEY) {
-    return NextResponse.json({ error: "未配置 DEEPSEEK_API_KEY" }, { status: 500 })
+  if (!ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: "未配置 ANTHROPIC_API_KEY" }, { status: 500 })
   }
 
   try {
@@ -57,20 +61,14 @@ export async function POST(req: NextRequest) {
 邮件内容：
 ${body}`
 
-    const reply = await callDeepseek([
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ])
+    const reply = await callClaude(systemPrompt, userPrompt)
 
     let translatedReply = ""
     if (!isChinese && reply) {
-      translatedReply = await callDeepseek([
-        {
-          role: "system",
-          content: "你是一位专业的翻译助手。请将以下邮件回复内容翻译为中文。只输出翻译结果，不要添加任何额外说明。",
-        },
-        { role: "user", content: reply },
-      ])
+      translatedReply = await callClaude(
+        "你是一位专业的翻译助手。请将以下邮件回复内容翻译为中文。只输出翻译结果，不要添加任何额外说明。",
+        reply,
+      )
     }
 
     return NextResponse.json({ reply, translatedReply })

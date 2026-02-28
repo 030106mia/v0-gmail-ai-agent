@@ -55,7 +55,7 @@ function ExpandableText({ text, className }: { text: string; className?: string 
       <p
         ref={ref}
         className={cn(
-          "text-xs leading-relaxed whitespace-pre-line transition-all",
+          "text-xs leading-relaxed whitespace-pre-line transition-all min-h-[3.5rem]",
           !expanded && "line-clamp-4",
           className,
         )}

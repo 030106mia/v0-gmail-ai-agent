@@ -1,7 +1,7 @@
 import type { EmailItem } from "./types"
 
-const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_URL || "https://api.deepseek.com"
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || ""
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ""
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514"
 
 interface AnalysisResult {
   id: string
@@ -45,14 +45,14 @@ export async function analyzeEmails(
   emails: EmailItem[],
   knownIds?: Set<string>,
 ): Promise<EmailItem[]> {
-  if (!DEEPSEEK_API_KEY || emails.length === 0) return emails
+  if (!ANTHROPIC_API_KEY || emails.length === 0) return emails
 
   const unknownEmails = knownIds
     ? emails.filter((e) => !knownIds.has(e.id))
     : emails
 
   if (unknownEmails.length === 0) {
-    console.log(`[AI] All ${emails.length} emails cached, skipping Deepseek call`)
+    console.log(`[AI] All ${emails.length} emails cached, skipping Claude call`)
     return emails
   }
 
@@ -61,21 +61,21 @@ export async function analyzeEmails(
   )
 
   try {
-    const res = await fetch(`${DEEPSEEK_API_URL}/v1/chat/completions`, {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "deepseek-chat",
+        model: ANTHROPIC_MODEL,
+        max_tokens: 2048,
+        temperature: 0.1,
+        system: SYSTEM_PROMPT,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: buildUserPrompt(unknownEmails) },
         ],
-        temperature: 0.1,
-        max_tokens: 2048,
-        response_format: { type: "json_object" },
       }),
     })
 
@@ -85,7 +85,7 @@ export async function analyzeEmails(
     }
 
     const data = await res.json()
-    const content = data.choices?.[0]?.message?.content?.trim() || ""
+    const content = data.content?.[0]?.text?.trim() || ""
 
     let results: AnalysisResult[]
     try {

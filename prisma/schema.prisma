@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model EmailCache {
+  emailId   String   @id
+  score     Float?
+  scoredAt  DateTime?
+  status    String   @default("pending")
+  isNew     Boolean  @default(true)
+  jiraKey   String?
+  updatedAt DateTime @updatedAt
+}
+
+model RequirementTicket {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  jiraKey     String?
+  jiraUrl     String?
+  status      String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
