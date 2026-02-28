@@ -11,6 +11,7 @@ node_modules/
 .DS_Store
 .vercel
 
+tsconfig.tsbuildinfo
 /lib/generated/prisma
 dev.db
 prisma/dev.db
