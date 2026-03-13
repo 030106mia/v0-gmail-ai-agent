@@ -2,6 +2,8 @@
 
 一个基于 Next.js + Claude AI 的 Gmail 智能处理工作台，帮助你快速处理用户邮件并管理产品需求。
 
+🔗 **在线地址**：[https://v0-gmail-ai-agent-mb24.vercel.app](https://v0-gmail-ai-agent-mb24.vercel.app)
+
 ## ✨ 功能特性
 
 ### 📬 邮件工作台
