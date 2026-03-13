@@ -45,7 +45,3 @@
 │   └── types.ts         # 类型定义
 └── prisma/              # 数据库 Schema
 ```
-
-## 📄 License
-
-MIT
